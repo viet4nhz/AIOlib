@@ -1,0 +1,919 @@
+-- AIOLib.lua | AIO Hub UI Library
+-- Drop-in UI for AIO Hub: palette, localization, widgets, buildUI
+-- Requires: TS, UIS, PL, LP (passed from host script via AIOLib.init)
+-- Usage: local Lib = loadstring(game:HttpGet(LIB_URL))()
+--        Lib.init({ C=C, runCmd=runCmd, waypoints=waypoints, ... })
+local _AIOLib = {}
+
+-- UI palette - refined
+local K={
+ bg   =Color3.fromRGB(20,18,26),
+ panel=Color3.fromRGB(25,23,31),
+ sec  =Color3.fromRGB(28,26,36),
+ row  =Color3.fromRGB(32,30,40),
+ rowH =Color3.fromRGB(38,36,48),
+ div  =Color3.fromRGB(52,50,64),
+ txt  =Color3.fromRGB(235,232,242),
+ sub  =Color3.fromRGB(110,106,128),
+ acc  =Color3.fromRGB(117,164,206),
+ accD =Color3.fromRGB(80,110,160),
+ on   =Color3.fromRGB(255,255,255),
+ onBg =Color3.fromRGB(100,148,200),
+ off  =Color3.fromRGB(50,48,62),
+ tab  =Color3.fromRGB(25,23,31),
+ sel  =Color3.fromRGB(35,33,45),
+ grn  =Color3.fromRGB(80,200,120),
+ red  =Color3.fromRGB(220,80,80),
+ ylw  =Color3.fromRGB(220,170,60),
+}
+-- shared copy helper
+local function copyText(s) pcall(function() (setclipboard or toclipboard or set_clipboard)(s) end) end
+-- ===== Localization =====
+-- Detect player locale: LP.LocaleId e.g. "vi-vn" -> "vi"
+local _loc=LP.LocaleId:sub(1,2):lower()
+-- String table: L[locale][key] = text. Falls back to "en".
+local _L={
+ en={
+  hub="AIO Hub", esp="ESP", aim="Aim", cmd="Cmd", tp="TP",
+  exec_="Exec", log_="Log", srch="Srch", info="Info",
+  vis="VISIBILITY", disp="DISPLAY", aim_s="AIM ASSIST", settings="SETTINGS",
+  esp_t="ESP", player="Player", entity="Entity", object="Object",
+  info_t="Info", hitbox="Hitbox", fill="Fill Opacity",
+  aim_t="Aim", aim_p="Aim Player", aim_e="Aim Entity", fov="FOV", smooth="Smoothness",
+  cmd_ph="type command + Enter", ready="> Ready",
+  wp_name="Waypoint name...", save="Save", go="Go", del="Del", no_wp="No waypoints yet.",
+  execute="Execute", clear="Clear", copy="Copy", rename="Rename",
+  search_ph="Search scripts...", trending="Loading trending...", searching="Searching...",
+  no_res="No results found.", need_http="Need HttpGet support",
+  save_tab="Save to Tab", copied="Copied!", max_tabs="Max 200 tabs",
+  risk="Use at your own risk.", copy_log="Copy Log",
+  tab_err="You can't delete this tab",
+ },
+ vi={
+  hub="AIO Hub", esp="ESP", aim="Ngam", cmd="Lenh", tp="TP",
+  exec_="Chay", log_="Log", srch="Tim", info="Info",
+  vis="HIEN THI", disp="GIAO DIEN", aim_s="HO TRO NGAM", settings="CAI DAT",
+  esp_t="ESP", player="Nguoi choi", entity="Thuc the", object="Vat the",
+  info_t="Thong tin", hitbox="Hitbox", fill="Do mo",
+  aim_t="Ngam", aim_p="Ngam nguoi choi", aim_e="Ngam thuc the", fov="Goc nhin", smooth="Do mo",
+  cmd_ph="Nhap lenh + Enter", ready="> San sang",
+  wp_name="Ten waypoint...", save="Luu", go="Di", del="Xoa", no_wp="Chua co waypoint.",
+  execute="Chay", clear="Xoa", copy="Sao chep", rename="Doi ten",
+  search_ph="Tim script...", trending="Dang tai xu huong...", searching="Dang tim...",
+  no_res="Khong tim thay ket qua.", need_http="Can HttpGet",
+  save_tab="Luu vao tab", copied="Da sao chep!", max_tabs="Toi da 200 tab",
+  risk="Su dung theo trach nhiem cua ban.", copy_log="Sao chep log",
+  tab_err="Khong the xoa tab nay",
+ },
+ ru={
+  hub="AIO Hub", esp="ESP", aim="??????", cmd="???????", tp="??",
+  exec_="?????????", log_="???", srch="?????", info="????",
+  vis="?????????", disp="???????????", aim_s="?????? ???????", settings="?????????",
+  esp_t="ESP", player="?????", entity="????????", object="??????",
+  info_t="????", hitbox="???????", fill="????????????",
+  aim_t="??????", aim_p="?????? ?? ??????", aim_e="?????? ?? ????????", fov="???", smooth="?????????",
+  cmd_ph="??????? ??????? + Enter", ready="> ??????",
+  wp_name="???????? ?????...", save="?????????", go="???????", del="???????", no_wp="??? ?????.",
+  execute="?????????", clear="????????", copy="??????????", rename="?????????????",
+  search_ph="????? ????????...", trending="????????...", searching="?????...",
+  no_res="?????? ?? ???????.", need_http="????? HttpGet",
+  save_tab="????????? ? ???", copied="???????????!", max_tabs="????. 200 ???????",
+  risk="??????????? ?? ???? ????.", copy_log="?????????? ???",
+  tab_err="?????? ??????? ??? ???????",
+ },
+ de={
+  hub="AIO Hub",esp="ESP",aim="Ziel",cmd="Befehle",tp="TP",
+  exec_="Ausfuhren",log_="Log",srch="Suche",info="Info",
+  vis="SICHTBARKEIT",disp="ANZEIGE",aim_s="ZIELASSISTENT",settings="EINSTELLUNGEN",
+  esp_t="ESP",player="Spieler",entity="Entitat",object="Objekt",
+  info_t="Info",hitbox="Hitbox",fill="Fulle",
+  aim_t="Ziel",aim_p="Spieler anvisieren",aim_e="Entitat anvisieren",fov="Sichtfeld",smooth="Glatte",
+  cmd_ph="Befehl + Enter",ready="> Bereit",
+  wp_name="Wegpunkt Name...",save="Speichern",go="Gehen",del="Loschen",no_wp="Keine Wegpunkte.",
+  execute="Ausfuhren",clear="Leeren",copy="Kopieren",rename="Umbenennen",
+  search_ph="Skripte suchen...",trending="Laden...",searching="Suchen...",
+  no_res="Keine Ergebnisse.",need_http="HttpGet benotigt",
+  save_tab="In Tab speichern",copied="Kopiert!",max_tabs="Max. 200 Tabs",
+  risk="Auf eigene Gefahr.",copy_log="Log kopieren",tab_err="Tab nicht loschbar",
+ },
+ pt={
+  hub="AIO Hub",esp="ESP",aim="Mira",cmd="Comandos",tp="TP",
+  exec_="Executar",log_="Log",srch="Buscar",info="Info",
+  vis="VISIBILIDADE",disp="EXIBICAO",aim_s="ASSISTENTE DE MIRA",settings="CONFIGURACOES",
+  esp_t="ESP",player="Jogador",entity="Entidade",object="Objeto",
+  info_t="Info",hitbox="Hitbox",fill="Opacidade",
+  aim_t="Mira",aim_p="Mirar jogador",aim_e="Mirar entidade",fov="Campo de visao",smooth="Suavidade",
+  cmd_ph="Comando + Enter",ready="> Pronto",
+  wp_name="Nome do ponto...",save="Salvar",go="Ir",del="Deletar",no_wp="Sem pontos.",
+  execute="Executar",clear="Limpar",copy="Copiar",rename="Renomear",
+  search_ph="Buscar scripts...",trending="Carregando...",searching="Buscando...",
+  no_res="Nenhum resultado.",need_http="Necessita HttpGet",
+  save_tab="Salvar na aba",copied="Copiado!",max_tabs="Max. 200 abas",
+  risk="Use por sua conta.",copy_log="Copiar log",tab_err="Nao pode deletar",
+ },
+}
+-- Accessor with EN fallback
+local function T(k)
+ local t=_L[_loc];if t and t[k] then return t[k] end
+ return _L["en"][k] or k
+end
+
+
+
+-- log collector for LogService
+local logBuf={}
+pcall(function()
+ game:GetService("LogService").MessageOut:Connect(function(msg,mt)
+ local prefix=mt==Enum.MessageType.MessageWarning and "[W] " or mt==Enum.MessageType.MessageError and "[E] " or "[I] "
+ table.insert(logBuf,1,{t=prefix..msg,k=mt})
+ if #logBuf>200 then table.remove(logBuf) end
+ end)
+end)
+
+-- Shared exec tab refs (accessible from Search page)
+local _execTabs=nil; local _rfExTabs=nil; local _edTB=nil; local _execCur=nil
+local function saveToExec(name,code)
+ if not _execTabs then return false end
+ table.insert(_execTabs,{name=name,code=code})
+ if _rfExTabs then _rfExTabs() end
+ return true
+end
+
+-- Config injected by Lib.init()
+local _cfg = {}
+
+function _AIOLib.init(cfg)
+ _cfg = cfg or {}
+ -- Inject into buildUI scope
+ local C        = _cfg.C        or {}
+ local runCmd   = _cfg.runCmd   or function() end
+ local waypoints= _cfg.waypoints or {}
+ local saveWP   = _cfg.saveWP   or function() end
+ local loadWP   = _cfg.loadWP   or function() end
+ local getHRP   = _cfg.getHRP   or function() end
+ local clrAll   = _cfg.clrAll   or function() end
+ local clrBB    = _cfg.clrBB    or function() end
+ local clrHB    = _cfg.clrHB    or function() end
+ local rfAlpha  = _cfg.rfAlpha  or function() end
+ local makeFov  = _cfg.makeFov  or function() end
+ local eC2      = _cfg.eC2      or {}
+ buildUI()
+end
+-- Luna-exact open/close: fade panel BG + UIStroke only
+-- CanvasGroup approach: GroupTransparency tweens entire panel as one layer
+-- Roblox docs: "tween GroupTransparency to affect object's overall transparency"
+-- No per-child tweening needed = smooth, no gray bleed, no jank
+local function panelHide(p)
+ -- Fade out: GroupTransparency 0?1 then hide
+ TS:Create(p,TweenInfo.new(0.28,Enum.EasingStyle.Quint,Enum.EasingDirection.In),
+  {GroupTransparency=1}):Play()
+ task.delay(0.3,function() if p and p.Parent then p.Visible=false;p.GroupTransparency=0 end end)
+end
+local function panelShow(p)
+ -- Fade in: show then GroupTransparency 1?0
+ p.GroupTransparency=1;p.Visible=true
+ TS:Create(p,TweenInfo.new(0.35,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),
+  {GroupTransparency=0}):Play()
+end
+local function buildUI()  -- called by init()
+ local old=LP.PlayerGui:FindFirstChild("AIO_UI");if old then old:Destroy() end
+ local oldF=LP.PlayerGui:FindFirstChild("AIO_FAB");if oldF then oldF:Destroy() end
+ local mob=UIS.TouchEnabled
+ local W,H,TW=490,340,100 -- wider panel + wider sidebar for i18n labels
+
+ -- Root ScreenGui
+ local sg=Instance.new("ScreenGui",LP.PlayerGui);sg.Name="AIO_UI";sg.ResetOnSpawn=false;sg.IgnoreGuiInset=true;sg.ZIndexBehavior=Enum.ZIndexBehavior.Sibling;sg.DisplayOrder=100
+
+ -- Panel
+ -- CanvasGroup allows GroupTransparency to fade entire panel as one unit
+ local panel=Instance.new("CanvasGroup",sg)
+ panel.Size=UDim2.new(0,W,0,H);panel.Position=UDim2.new(.5,-W/2,.5,-H/2)
+ panel.BackgroundColor3=K.panel;panel.BorderSizePixel=0;panel.Active=true;panel.Draggable=true
+ if not mob then panelShow(panel) else panel.Visible=false end
+ local pc=Instance.new("UICorner",panel);pc.CornerRadius=UDim.new(0,12)
+  local ps=Instance.new("UIStroke",panel);ps.Color=Color3.fromRGB(64,60,80);ps.Thickness=1.2;ps.Transparency=0.3
+
+ -- Title bar (taller: avatar + name)
+ local TITLE_H=52
+ local title=Instance.new("Frame",panel);title.Size=UDim2.new(1,0,0,TITLE_H);title.BackgroundColor3=K.panel;title.BorderSizePixel=0
+ Instance.new("UICorner",title).CornerRadius=UDim.new(0,12)
+ local tfix=Instance.new("Frame",title);tfix.Size=UDim2.new(1,0,.5,0);tfix.Position=UDim2.new(0,0,.5,0);tfix.BackgroundColor3=K.panel;tfix.BorderSizePixel=0
+ -- Avatar circle
+ local avF=Instance.new("Frame",title);avF.Size=UDim2.new(0,36,0,36);avF.Position=UDim2.new(0,10,0.5,-18);avF.BackgroundColor3=K.sec;avF.BorderSizePixel=0
+ Instance.new("UICorner",avF).CornerRadius=UDim.new(1,0)
+ Instance.new("UIStroke",avF).Color=K.div
+ local avImg=Instance.new("ImageLabel",avF);avImg.Size=UDim2.fromScale(1,1);avImg.BackgroundTransparency=1;avImg.ScaleType=Enum.ScaleType.Fit;avImg.Image=""
+ Instance.new("UICorner",avImg).CornerRadius=UDim.new(1,0)
+ -- Display name
+ local dispLbl=Instance.new("TextLabel",title);dispLbl.Size=UDim2.new(1,-130,0,18);dispLbl.Position=UDim2.new(0,52,0,8);dispLbl.BackgroundTransparency=1;dispLbl.TextColor3=K.txt;dispLbl.Font=Enum.Font.GothamBold;dispLbl.TextSize=12;dispLbl.TextXAlignment=Enum.TextXAlignment.Left;dispLbl.Text=LP.DisplayName
+ -- @username
+ local userLbl=Instance.new("TextLabel",title);userLbl.Size=UDim2.new(1,-130,0,14);userLbl.Position=UDim2.new(0,52,0,27);userLbl.BackgroundTransparency=1;userLbl.TextColor3=K.sub;userLbl.Font=Enum.Font.Gotham;userLbl.TextSize=10;userLbl.TextXAlignment=Enum.TextXAlignment.Left;userLbl.Text="@"..LP.Name
+ -- AIO Hub label (right side)
+ local tlbl=Instance.new("TextLabel",title);tlbl.Size=UDim2.new(0,70,1,0);tlbl.Position=UDim2.new(1,-78,0,0);tlbl.BackgroundTransparency=1;tlbl.TextColor3=K.acc;tlbl.Font=Enum.Font.GothamBold;tlbl.TextSize=11;tlbl.TextXAlignment=Enum.TextXAlignment.Right;tlbl.Text="AIO Hub"
+ -- Load avatar async
+ task.spawn(function()
+  local ok,url=pcall(function() return PL:GetUserThumbnailAsync(LP.UserId,Enum.ThumbnailType.HeadShot,Enum.ThumbnailSize.Size48x48) end)
+  if ok and url~="" and avImg and avImg.Parent then avImg.Image=url end
+ end)
+ local hdiv=Instance.new("Frame",panel);hdiv.Size=UDim2.new(1,0,0,1);hdiv.Position=UDim2.new(0,0,0,TITLE_H);hdiv.BackgroundColor3=K.div;hdiv.BorderSizePixel=0
+ local hdivGrad=Instance.new("UIGradient",hdiv);hdivGrad.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.fromRGB(60,90,160)),ColorSequenceKeypoint.new(0.5,Color3.fromRGB(117,164,206)),ColorSequenceKeypoint.new(1,Color3.fromRGB(60,90,160))};hdivGrad.Rotation=0
+
+ local CH=H-TITLE_H-1
+ -- Sidebar
+ local sb=Instance.new("ScrollingFrame",panel)
+ sb.Size=UDim2.new(0,TW,0,CH);sb.Position=UDim2.new(0,0,0,TITLE_H+1)
+ sb.BackgroundColor3=K.sec;sb.BorderSizePixel=0
+ sb.ScrollBarThickness=0;sb.ScrollingDirection=Enum.ScrollingDirection.Y
+ sb.AutomaticCanvasSize=Enum.AutomaticSize.Y;sb.CanvasSize=UDim2.new(0,0,0,0)
+ sb.ScrollBarImageTransparency=1;sb.ElasticBehavior=Enum.ElasticBehavior.Never
+ Instance.new("UICorner",sb).CornerRadius=UDim.new(0,10)
+ local sbll=Instance.new("UIListLayout",sb);sbll.SortOrder=Enum.SortOrder.LayoutOrder;sbll.Padding=UDim.new(0,1)
+ local sbpd=Instance.new("UIPadding",sb);sbpd.PaddingTop=UDim.new(0,4);sbpd.PaddingLeft=UDim.new(0,3);sbpd.PaddingRight=UDim.new(0,3)
+ local sdv=Instance.new("Frame",panel);sdv.Size=UDim2.new(0,1,0,CH);sdv.Position=UDim2.new(0,TW,0,TITLE_H+1);sdv.BackgroundColor3=K.div;sdv.BorderSizePixel=0
+
+ -- Pages factory
+ local pages={}
+ local function mkPg(n,plain)
+ local f
+ if plain then
+ f=Instance.new("Frame",panel);f.BackgroundColor3=K.bg;f.BorderSizePixel=0
+ else
+ f=Instance.new("ScrollingFrame",panel);f.BackgroundColor3=K.bg;f.BackgroundTransparency=0;f.BorderSizePixel=0
+ f.ScrollBarThickness=4;f.ScrollBarImageColor3=K.acc;f.ScrollBarImageTransparency=0.4
+ f.AutomaticCanvasSize=Enum.AutomaticSize.Y;f.CanvasSize=UDim2.new(0,0,0,0)
+ Instance.new("UIListLayout",f).SortOrder=Enum.SortOrder.LayoutOrder
+ end
+ f.Size=UDim2.new(1,-TW-1,0,CH);f.Position=UDim2.new(0,TW+1,0,TITLE_H+1);f.Visible=false
+ pages[n]=f;return f
+ end
+ local espPg=mkPg("esp");local aimPg=mkPg("aim");local cmdPg=mkPg("cmd")
+ local tpPg=mkPg("tp");local exPg=mkPg("ex",true);local lgPg=mkPg("lg",true);local srchPg=mkPg("srch",true)
+ local function addCorner(f) if f:IsA("Frame") and not f:FindFirstChildOfClass("UICorner") then Instance.new("UICorner",f).CornerRadius=UDim.new(0,8) end end;local crePg=mkPg("cre")
+ espPg.Visible=true
+
+ -- Tab factory
+ local tbs={};local cur="esp"
+ local function mkTab(lbl,pg,ord)
+ local b=Instance.new("TextButton",sb);b.Size=UDim2.new(1,0,0,32);b.BackgroundColor3=pg==cur and K.sel or K.tab;b.BorderSizePixel=0;b.AutoButtonColor=false;b.LayoutOrder=ord;b.Text="";b.TextTransparency=1
+  Instance.new("UICorner",b).CornerRadius=UDim.new(0,6)
+  local bst=Instance.new("UIStroke",b);bst.Thickness=1;bst.Color=pg==cur and Color3.fromRGB(90,86,112) or Color3.fromRGB(52,50,62);bst.Transparency=pg==cur and 0.41 or 1
+ local tl2=Instance.new("TextLabel",b);tl2.Size=UDim2.new(1,-4,1,0);tl2.Position=UDim2.new(0,4,0,0);tl2.BackgroundTransparency=1;tl2.TextColor3=pg==cur and K.txt or K.sub;tl2.Font=Enum.Font.GothamSemibold;tl2.TextSize=9;tl2.TextScaled=false;tl2.TextTruncate=Enum.TextTruncate.AtEnd;tl2.Text=lbl;tbs[pg]={b=b,t=tl2}
+ if pg==cur then local a=Instance.new("Frame",b);a.Size=UDim2.new(0,2,0,20);a.Position=UDim2.new(0,0,0.5,-10);a.BackgroundColor3=K.acc;a.BorderSizePixel=0;tbs[pg].a=a end
+ b.MouseButton1Click:Connect(function()
+ if cur==pg then return end
+ -- deselect old tab
+ if tbs[cur].a then tbs[cur].a:Destroy();tbs[cur].a=nil end
+ local TI_TAB=TweenInfo.new(.16,Enum.EasingStyle.Quint,Enum.EasingDirection.Out)
+ TS:Create(tbs[cur].b,TI_TAB,{BackgroundColor3=K.tab}):Play()
+ TS:Create(tbs[cur].t,TI_TAB,{TextColor3=K.sub}):Play()
+ -- hide old page instantly (prevents double-render)
+ if pages[cur] then pages[cur].Visible=false end
+ cur=pg
+ -- select new tab
+ TS:Create(b,TI_TAB,{BackgroundColor3=K.sel}):Play()
+ TS:Create(tl2,TI_TAB,{TextColor3=K.txt}):Play()
+ if bst then TS:Create(bst,TI_TAB,{Transparency=0.41,Color=Color3.fromRGB(90,86,112)}):Play() end
+ -- accent bar grow (height 0-20)
+ local ac=Instance.new("Frame",b)
+ ac.Size=UDim2.new(0,2,0,0);ac.Position=UDim2.new(0,0,.5,0)
+ ac.BackgroundColor3=K.acc;ac.BorderSizePixel=0;tbs[pg].a=ac
+ TS:Create(ac,TweenInfo.new(.22,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),
+ {Size=UDim2.new(0,2,0,18),Position=UDim2.new(0,0,.5,-9)}):Play()
+ -- show new page with clean fade via UIColorGrading trick: just show it
+ local np=pages[cur];if np then np.Visible=true end
+ end)
+ end
+ mkTab(T("esp"),"esp",1);mkTab(T("aim"),"aim",2);mkTab(T("cmd"),"cmd",3);mkTab(T("tp"),"tp",4)
+ mkTab(T("exec_"),"ex",5);mkTab(T("log_"),"lg",6);mkTab(T("srch"),"srch",7);mkTab(T("info"),"cre",8)
+
+ -- Widget helpers (Luna-inspired)
+ local TI=TweenInfo.new(0.3,Enum.EasingStyle.Exponential)
+ local TI_IN=TweenInfo.new(0.7,Enum.EasingStyle.Exponential)
+ local C3=Color3.fromRGB
+ local STROKE_IDLE=C3(52,50,62);local STROKE_HOVER=C3(90,86,112);local STROKE_ON=C3(94,140,255)
+ local function rowAppear(row,stroke,labels)
+  -- Solid row, just fade text in (semi-transparent causes game scene bleed on mobile)
+  row.BackgroundTransparency=0
+  if stroke then stroke.Transparency=0.6 end
+  for _,lb in ipairs(labels) do lb.TextTransparency=0.8 end
+  if stroke then TS:Create(stroke,TI_IN,{Transparency=0.6}):Play() end
+  for _,lb in ipairs(labels) do TS:Create(lb,TI_IN,{TextTransparency=0}):Play() end
+ end
+ local function mkSw(pg,lbl,gF,sF,ex2)
+  local row=Instance.new("Frame",pg);row.Size=UDim2.new(1,0,0,40);row.BackgroundColor3=K.row;row.BorderSizePixel=0
+  Instance.new("UICorner",row).CornerRadius=UDim.new(0,6)
+  local st=Instance.new("UIStroke",row);st.Color=STROKE_IDLE;st.Thickness=1
+  local lb=Instance.new("TextLabel",row);lb.Size=UDim2.new(.7,0,1,0);lb.Position=UDim2.new(0,12,0,0);lb.BackgroundTransparency=1;lb.TextColor3=K.txt;lb.Font=Enum.Font.GothamSemibold;lb.TextSize=12;lb.TextXAlignment=Enum.TextXAlignment.Left;lb.Text=lbl
+  local tr=Instance.new("Frame",row);tr.Size=UDim2.new(0,36,0,19);tr.Position=UDim2.new(1,-48,.5,-9.5);tr.BackgroundColor3=gF() and K.onBg or K.off;tr.BorderSizePixel=0;Instance.new("UICorner",tr).CornerRadius=UDim.new(1,0)
+  local trSt=Instance.new("UIStroke",tr);trSt.Thickness=1;trSt.Color=gF() and STROKE_ON or STROKE_IDLE
+  local kn=Instance.new("Frame",tr);kn.Size=UDim2.new(0,13,0,13);kn.BorderSizePixel=0;kn.Position=gF() and UDim2.new(1,-16,.5,-6.5) or UDim2.new(0,3,.5,-6.5);kn.BackgroundColor3=gF() and C3(255,255,255) or C3(120,118,132);Instance.new("UICorner",kn).CornerRadius=UDim.new(1,0)
+  local btn=Instance.new("TextButton",row);btn.Size=UDim2.fromScale(1,1);btn.BackgroundTransparency=1;btn.Text=""
+  btn.MouseEnter:Connect(function() TS:Create(st,TI,{Color=STROKE_HOVER}):Play() end)
+  btn.MouseLeave:Connect(function() TS:Create(st,TI,{Color=STROKE_IDLE}):Play() end)
+  btn.MouseButton1Click:Connect(function()
+   local v=not gF();sF(v);if ex2 and not v then ex2() end
+   TS:Create(tr,TI,{BackgroundColor3=v and K.onBg or K.off}):Play()
+   TS:Create(trSt,TI,{Color=v and STROKE_ON or STROKE_IDLE}):Play()
+   TS:Create(kn,TI,{Position=v and UDim2.new(1,-16,.5,-6.5) or UDim2.new(0,3,.5,-6.5),BackgroundColor3=v and C3(255,255,255) or C3(120,118,132)}):Play()
+  end)
+  rowAppear(row,st,{lb})
+ end
+ local function mkSl(pg,lbl,gF,sF,mn,mx,cb)
+  local row=Instance.new("Frame",pg);row.Size=UDim2.new(1,0,0,52);row.BackgroundColor3=K.row;row.BorderSizePixel=0
+  Instance.new("UICorner",row).CornerRadius=UDim.new(0,6)
+  local st=Instance.new("UIStroke",row);st.Color=STROKE_IDLE;st.Thickness=1
+  local lb=Instance.new("TextLabel",row);lb.Size=UDim2.new(.6,0,0,22);lb.Position=UDim2.new(0,12,0,4);lb.BackgroundTransparency=1;lb.TextColor3=K.txt;lb.Font=Enum.Font.GothamSemibold;lb.TextSize=12;lb.TextXAlignment=Enum.TextXAlignment.Left;lb.Text=lbl
+  local vl=Instance.new("TextLabel",row);vl.Size=UDim2.new(.35,0,0,22);vl.Position=UDim2.new(.65,-10,0,4);vl.BackgroundTransparency=1;vl.TextColor3=K.acc;vl.Font=Enum.Font.GothamBold;vl.TextSize=12;vl.TextXAlignment=Enum.TextXAlignment.Right;vl.Text=tostring(gF())
+  local trk=Instance.new("Frame",row);trk.Size=UDim2.new(1,-24,0,5);trk.Position=UDim2.new(0,12,0,36);trk.BackgroundColor3=K.off;trk.BorderSizePixel=0;Instance.new("UICorner",trk).CornerRadius=UDim.new(1,0)
+  local fl=Instance.new("Frame",trk);fl.Size=UDim2.new((gF()-mn)/(mx-mn),0,1,0);fl.BackgroundColor3=K.acc;fl.BorderSizePixel=0;Instance.new("UICorner",fl).CornerRadius=UDim.new(1,0)
+  local fg=Instance.new("UIGradient",fl);fg.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,K.accD),ColorSequenceKeypoint.new(1,K.acc)};fg.Rotation=0
+  local knob2=Instance.new("Frame",trk);knob2.Size=UDim2.new(0,12,0,12);knob2.AnchorPoint=Vector2.new(.5,.5);knob2.Position=UDim2.new((gF()-mn)/(mx-mn),0,.5,0);knob2.BackgroundColor3=C3(255,255,255);knob2.BorderSizePixel=0;Instance.new("UICorner",knob2).CornerRadius=UDim.new(1,0)
+  local kst=Instance.new("UIStroke",knob2);kst.Color=K.accD;kst.Thickness=1.5
+  local btn=Instance.new("TextButton",trk);btn.Size=UDim2.fromScale(1,1);btn.BackgroundTransparency=1;btn.Text=""
+  local drag=false
+  local function slide(mx2) local p=math.clamp((mx2-trk.AbsolutePosition.X)/trk.AbsoluteSize.X,0,1);local val=math.floor(mn+p*(mx-mn));sF(val);fl.Size=UDim2.new(p,0,1,0);TS:Create(knob2,TweenInfo.new(.06,Enum.EasingStyle.Exponential),{Position=UDim2.new(p,0,.5,0)}):Play();vl.Text=tostring(val);if cb then cb(val) end end
+  btn.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then drag=true;slide(i.Position.X) end end)
+  UIS.InputChanged:Connect(function(i) if drag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then slide(i.Position.X) end end)
+  UIS.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then drag=false end end)
+  btn.MouseEnter:Connect(function() TS:Create(st,TI,{Color=STROKE_HOVER}):Play() end)
+  btn.MouseLeave:Connect(function() TS:Create(st,TI,{Color=STROKE_IDLE}):Play() end)
+  rowAppear(row,st,{lb,vl})
+ end
+ local function mkSec(pg,lbl)
+  local f=Instance.new("Frame",pg);f.Size=UDim2.new(1,0,0,22);f.BackgroundTransparency=1;f.BorderSizePixel=0
+  local line=Instance.new("Frame",f);line.Size=UDim2.new(1,-24,0,1);line.Position=UDim2.new(0,12,1,-1);line.BackgroundColor3=K.div;line.BorderSizePixel=0
+  local t=Instance.new("TextLabel",f);t.Size=UDim2.new(1,-12,1,0);t.Position=UDim2.new(0,12,0,0);t.BackgroundTransparency=1;t.TextColor3=K.acc;t.Font=Enum.Font.GothamBold;t.TextSize=9;t.TextXAlignment=Enum.TextXAlignment.Left;t.Text=lbl:upper()
+  t.TextTransparency=1;TS:Create(t,TI_IN,{TextTransparency=0}):Play()
+ end
+ local function mkBtn(parent,lbl,x,y,w,h,bg,tc)
+  local b=Instance.new("TextButton",parent);b.Size=UDim2.new(0,w,0,h);b.Position=UDim2.new(0,x,0,y);b.BackgroundColor3=bg;b.BackgroundTransparency=0.35;b.BorderSizePixel=0;b.AutoButtonColor=false;b.TextColor3=tc;b.Font=Enum.Font.GothamBold;b.TextSize=11;b.Text=lbl
+  Instance.new("UICorner",b).CornerRadius=UDim.new(0,6)
+  local bst=Instance.new("UIStroke",b);bst.Color=STROKE_IDLE;bst.Thickness=1;bst.Transparency=0.5
+  b.MouseEnter:Connect(function() TS:Create(bst,TI,{Color=STROKE_HOVER,Transparency=0}):Play();TS:Create(b,TI,{BackgroundTransparency=0.2}):Play() end)
+  b.MouseLeave:Connect(function() TS:Create(bst,TI,{Color=STROKE_IDLE,Transparency=0.5}):Play();TS:Create(b,TI,{BackgroundTransparency=0.35}):Play() end)
+  b.MouseButton1Down:Connect(function() TS:Create(b,TI,{BackgroundTransparency=0.55}):Play() end)
+  b.MouseButton1Up:Connect(function() TS:Create(b,TI,{BackgroundTransparency=0.2}):Play() end)
+  return b
+ end
+
+ -- ===== ESP page =====
+ mkSec(espPg,T("vis"))
+ mkSw(espPg,"ESP [Z]",function()return C.on end,function(v)C.on=v;if not v then clrAll() end end)
+ mkSw(espPg,"Player [X]",function()return C.player end,function(v)C.player=v end)
+ mkSw(espPg,"Entity [C]",function()return C.entity end,function(v)C.entity=v end)
+ mkSw(espPg,"Object [V]",function()return C.object end,function(v)C.object=v end)
+ mkSec(espPg,T("disp"))
+ mkSw(espPg,"Info [B]",function()return C.info end,function(v)C.info=v;if not v then clrBB() end end)
+ mkSw(espPg,"Hitbox [N]",function()return C.hitbox end,function(v)C.hitbox=v;if not v then clrHB() end end)
+ mkSl(espPg,T("fill"),function()return C.alpha end,function(v)C.alpha=v end,0,25,function() rfAlpha() end)
+
+ -- ===== Aim page =====
+ mkSec(aimPg,T("aim_s"))
+ mkSw(aimPg,"Aim [G]",function()return C.aimOn end,function(v)C.aimOn=v;makeFov() end)
+ mkSw(aimPg,T("aim_p"),function()return C.aimPlayer end,function(v)C.aimPlayer=v end)
+ mkSw(aimPg,T("aim_e"),function()return C.aimEntity end,function(v)C.aimEntity=v end)
+ mkSec(aimPg,T("settings"))
+ mkSl(aimPg,T("fov"),function()return C.aimFov end,function(v)C.aimFov=v end,1,100,function(v) if fovFrame and fovFrame.Parent then fovFrame.Size=UDim2.new(0,v*4,0,v*4) end end)
+ mkSl(aimPg,T("smooth"),function()return C.aimSmooth end,function(v)C.aimSmooth=v end,1,100)
+
+ -- ===== Cmd page =====
+ local iRow=Instance.new("Frame",cmdPg);iRow.Size=UDim2.new(1,0,0,40);iRow.BackgroundColor3=K.sec;iRow.BorderSizePixel=0
+ local dv0=Instance.new("Frame",iRow);dv0.Size=UDim2.new(1,0,0,1);dv0.Position=UDim2.new(0,0,1,-1);dv0.BackgroundColor3=K.div;dv0.BorderSizePixel=0
+ local tb=Instance.new("TextBox",iRow);tb.Size=UDim2.new(1,-14,1,-10);tb.Position=UDim2.new(0,7,0,5);tb.BackgroundColor3=K.bg;tb.BorderSizePixel=0;tb.TextColor3=K.txt;tb.Font=Enum.Font.Gotham;tb.TextSize=12;tb.PlaceholderText=T("cmd_ph");tb.PlaceholderColor3=K.sub;tb.ClearTextOnFocus=false;tb.Text=""
+ Instance.new("UICorner",tb).CornerRadius=UDim.new(0,6)
+ local logF=Instance.new("Frame",cmdPg);logF.Size=UDim2.new(1,0,0,72);logF.BackgroundColor3=K.bg;logF.BorderSizePixel=0
+ local logLL=Instance.new("UIListLayout",logF);logLL.SortOrder=Enum.SortOrder.LayoutOrder;logLL.VerticalAlignment=Enum.VerticalAlignment.Bottom
+ local lls={}
+ local function addLog(m,c2)
+ local tl=Instance.new("TextLabel",logF);tl.Size=UDim2.new(1,-8,0,14);tl.BackgroundTransparency=1;tl.Font=Enum.Font.Code;tl.TextSize=10;tl.TextXAlignment=Enum.TextXAlignment.Left;tl.TextTruncate=Enum.TextTruncate.AtEnd;tl.TextColor3=K.bg;tl.Text=" "..m
+ tl.TextTransparency=0.9
+ TS:Create(tl,TweenInfo.new(.3,Enum.EasingStyle.Exponential),{TextTransparency=0,TextColor3=c2 or K.sub}):Play()
+ table.insert(lls,tl);if #lls>5 then lls[1]:Destroy();table.remove(lls,1) end
+ end
+ addLog(T("ready"))
+ local function exec()
+ local t=tb.Text;if t=="" then return end;addLog("> "..t,K.txt);runCmd(t,function(m) addLog(" "..m) end);tb.Text=""
+ end
+ tb.FocusLost:Connect(function(enter) if enter then exec() elseif mob and tb.Text~="" then exec() end end)
+ -- Tutorial: items go directly into cmdPg (which is a ScrollingFrame)
+ local dvT=Instance.new("Frame",cmdPg);dvT.Size=UDim2.new(1,0,0,1);dvT.BackgroundColor3=K.div;dvT.BorderSizePixel=0
+ local function mkT(txt,c2)
+  local f=Instance.new("Frame",cmdPg);f.Size=UDim2.new(1,0,0,15);f.BackgroundTransparency=1;f.BorderSizePixel=0
+  local tl=Instance.new("TextLabel",f);tl.Size=UDim2.new(1,-12,1,0);tl.Position=UDim2.new(0,6,0,0);tl.BackgroundTransparency=1;tl.TextColor3=c2 or K.sub;tl.Font=Enum.Font.Code;tl.TextSize=10;tl.TextXAlignment=Enum.TextXAlignment.Left;tl.Text=txt
+ end
+ local W2=K.ylw
+ local function mkTH(txt) mkT(txt,K.acc) end
+ mkTH("Movement");mkT("ws/jp [val] stopws/unws stopjp/unjp")
+ mkT("fly [val] stopfly | cfly [val] uncfly")
+ mkT("gravity/grav [val] | noclip | infjump")
+ mkT("follow [plr] | tpwalk [mul] | float")
+ mkTH("Player");mkT("god ungod | invisible | lay | trip | reset")
+ mkT("spin [spd] | norotate | noarms | nolegs")
+ mkT("anim [id] | dance | sitwalk | creeper")
+ mkT("drophats | reach [n] | xray | headsit [plr]")
+ mkT("bang [plr] | carpet [plr] | freeze [plr]")
+ mkTH("Camera / World");mkT("firstp | thirdp | fov [v] | fixcam")
+ mkT("spectate [plr] | goto [plr] | tp x y z")
+ mkT("fullbright | day | night | nofog | brightness")
+ mkTH("Chat");mkT("chat/say [text] | ping | grabtools")
+ mkTH("Plugins (need HttpGet)");mkT("dex | console | remotespy/spy | audiologger | vr")
+ mkTH("Script loader");mkT("ls [url] | ll [file.lua] | btools | f3x")
+ mkT("ws/jp loop until stopws/stopjp",W2)
+
+ -- ===== TP page =====
+ local EXEC_FILE="AIOHub_Exec.json"
+ local wpRows={};local function rfWP()
+ for _,r in ipairs(wpRows) do r:Destroy() end;wpRows={}
+ if #waypoints==0 then
+ local e=Instance.new("Frame",tpPg);e.Size=UDim2.new(1,0,0,30);e.BackgroundColor3=K.row;e.BorderSizePixel=0;local el=Instance.new("TextLabel",e);el.Size=UDim2.new(1,-12,1,0);el.Position=UDim2.new(0,6,0,0);el.BackgroundTransparency=1;el.TextColor3=K.sub;el.Font=Enum.Font.Gotham;el.TextSize=11;el.Text="No waypoints saved yet.";table.insert(wpRows,e);return
+ end
+ for _,wp in ipairs(waypoints) do
+ local r=Instance.new("Frame",tpPg);r.Size=UDim2.new(1,0,0,34);r.BackgroundColor3=K.row;r.BorderSizePixel=0
+ -- fade each row in cleanly
+ r.BackgroundTransparency=1;TS:Create(r,TweenInfo.new(.25,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out),{BackgroundTransparency=0}):Play()
+ local dv=Instance.new("Frame",r);dv.Size=UDim2.new(1,-16,0,1);dv.Position=UDim2.new(0,8,1,-1);dv.BackgroundColor3=K.div;dv.BorderSizePixel=0
+ local nl=Instance.new("TextLabel",r);nl.Size=UDim2.new(.55,0,1,0);nl.Position=UDim2.new(0,10,0,0);nl.BackgroundTransparency=1;nl.TextColor3=K.txt;nl.Font=Enum.Font.Gotham;nl.TextSize=11;nl.TextXAlignment=Enum.TextXAlignment.Left;nl.Text=wp.name
+ local wpRef=wp
+ local go=mkBtn(r,T("go"),-84+r.Size.X.Offset,0,36,22,K.accD,K.acc)
+ go.Position=UDim2.new(1,-80,0.5,-11)
+ go.MouseButton1Click:Connect(function() local hrp=getHRP();if hrp then hrp.CFrame=CFrame.new(wpRef.pos+Vector3.new(0,3,0)) end end)
+ local del=mkBtn(r,T("del"),0,0,36,22,Color3.fromRGB(60,22,22),K.red)
+ del.Position=UDim2.new(1,-40,0.5,-11)
+ del.MouseButton1Click:Connect(function() for i,w in ipairs(waypoints) do if w==wpRef then table.remove(waypoints,i);break end end;saveWP();rfWP() end)
+ table.insert(wpRows,r)
+ end
+ end
+ local sRow=Instance.new("Frame",tpPg);sRow.Size=UDim2.new(1,0,0,40);sRow.BackgroundColor3=K.sec;sRow.BorderSizePixel=0
+ local svTB=Instance.new("TextBox",sRow);svTB.Size=UDim2.new(1,-76,1,-10);svTB.Position=UDim2.new(0,8,0,5);svTB.BackgroundColor3=K.row;svTB.BorderSizePixel=0;svTB.TextColor3=K.txt;svTB.Font=Enum.Font.Gotham;svTB.TextSize=12;svTB.PlaceholderText=T("wp_name");svTB.PlaceholderColor3=K.sub;svTB.ClearTextOnFocus=false;svTB.Text=""
+ Instance.new("UICorner",svTB).CornerRadius=UDim.new(0,6)
+ local svB=mkBtn(sRow,T("save"),0,0,62,28,Color3.fromRGB(24,55,30),Color3.fromRGB(80,210,110))
+ svB.Position=UDim2.new(1,-68,0.5,-14)
+ svB.MouseButton1Click:Connect(function()
+ local hrp=getHRP();if not hrp then return end
+ local n=svTB.Text=="" and ("WP "..tostring(#waypoints+1)) or svTB.Text
+ table.insert(waypoints,{name=n,pos=hrp.Position});svTB.Text="";saveWP();rfWP()
+ end)
+ rfWP()
+
+ -- ===== Exec page =====
+ do
+ local EXEC_SAVE="AIOHub_Exec.json"
+ local execTabs={}
+ local function loadExecTabs()
+ if not readfile then execTabs={{name="Tab 1",code=""}};return end
+ local ok,raw=pcall(readfile,EXEC_SAVE);if not ok or not raw or raw=="" then execTabs={{name="Tab 1",code=""}};return end
+ local ok2,data=pcall(HS.JSONDecode,HS,raw);if not ok2 or type(data)~="table" or #data==0 then execTabs={{name="Tab 1",code=""}};return end
+ execTabs=data
+ end
+ local function saveExecTabs() if not writefile then return end;pcall(function() writefile(EXEC_SAVE,HS:JSONEncode(execTabs)) end) end
+ loadExecTabs()
+ local execCur=1
+ local RS2=90;local BB=28 -- right sidebar width, bottom bar height
+
+ -- Editor area
+ local edF=Instance.new("Frame",exPg);edF.Size=UDim2.new(1,-RS2-1,1,-BB-1);edF.BackgroundColor3=K.bg;edF.BorderSizePixel=0
+ local edTB=Instance.new("TextBox",edF);edTB.Size=UDim2.fromScale(1,1);edTB.BackgroundTransparency=1;edTB.TextColor3=Color3.fromRGB(200,225,200);edTB.Font=Enum.Font.Code;edTB.TextSize=12;edTB.MultiLine=true;edTB.ClearTextOnFocus=false;edTB.TextXAlignment=Enum.TextXAlignment.Left;edTB.TextYAlignment=Enum.TextYAlignment.Top;edTB.PlaceholderText="-- Lua script here...";edTB.PlaceholderColor3=K.sub;edTB.Text="";edTB.BorderSizePixel=0
+ -- Tab sidebar
+ local tsDv=Instance.new("Frame",exPg);tsDv.Size=UDim2.new(0,1,1,-BB-1);tsDv.Position=UDim2.new(1,-RS2-1,0,0);tsDv.BackgroundColor3=K.div;tsDv.BorderSizePixel=0
+ local tsF=Instance.new("Frame",exPg);tsF.Size=UDim2.new(0,RS2,1,-BB-1);tsF.Position=UDim2.new(1,-RS2,0,0);tsF.BackgroundColor3=K.sec;tsF.BorderSizePixel=0
+ local tsSF=Instance.new("ScrollingFrame",tsF);tsSF.Size=UDim2.new(1,0,1,-22);tsSF.BackgroundTransparency=1;tsSF.BorderSizePixel=0;tsSF.ScrollBarThickness=2;tsSF.ScrollBarImageColor3=K.acc;tsSF.AutomaticCanvasSize=Enum.AutomaticSize.Y;tsSF.CanvasSize=UDim2.new(0,0,0,0)
+ Instance.new("UIListLayout",tsSF).SortOrder=Enum.SortOrder.LayoutOrder
+ local addTabB=Instance.new("TextButton",tsF);addTabB.Size=UDim2.new(1,0,0,22);addTabB.Position=UDim2.new(0,0,1,-22);addTabB.BackgroundColor3=K.accD;addTabB.BorderSizePixel=0;addTabB.AutoButtonColor=false;addTabB.TextColor3=K.acc;addTabB.Font=Enum.Font.GothamBold;addTabB.TextSize=14;addTabB.Text="+"
+ -- Toast
+ local toast=Instance.new("TextLabel",exPg);toast.Size=UDim2.new(1,-RS2-2,0,20);toast.Position=UDim2.new(0,0,0,0);toast.BackgroundColor3=Color3.fromRGB(70,20,20);toast.BorderSizePixel=0;toast.TextColor3=Color3.fromRGB(255,110,110);toast.Font=Enum.Font.GothamBold;toast.TextSize=11;toast.Text="";toast.Visible=false;toast.ZIndex=10
+ local toastTask=nil
+ local function showToast(msg,good)
+ if toastTask then task.cancel(toastTask) end
+ toast.BackgroundColor3=good and Color3.fromRGB(20,60,28) or Color3.fromRGB(70,20,20)
+ toast.TextColor3=good and Color3.fromRGB(80,220,110) or Color3.fromRGB(255,110,110)
+ toast.Text=" "..msg;toast.BackgroundTransparency=1;toast.Visible=true
+ TS:Create(toast,TweenInfo.new(.3,Enum.EasingStyle.Exponential),{BackgroundTransparency=0}):Play()
+ toastTask=task.delay(1.7,function()
+ TS:Create(toast,TweenInfo.new(.4,Enum.EasingStyle.Exponential),{BackgroundTransparency=1}):Play()
+ task.delay(.32,function() if toast and toast.Parent then toast.Visible=false end end)
+ end)
+ end
+ -- Tab list refresh
+ local function rfExTabs()
+ for _,c in ipairs(tsSF:GetChildren()) do if c:IsA("Frame") then c:Destroy() end end
+ for idx,tab in ipairs(execTabs) do
+ local r=Instance.new("Frame",tsSF);r.Size=UDim2.new(1,0,0,24);r.BackgroundColor3=idx==execCur and K.sel or K.tab;r.BorderSizePixel=0;r.LayoutOrder=idx
+ if idx==execCur then local ac=Instance.new("Frame",r);ac.Size=UDim2.new(0,2,1,0);ac.BackgroundColor3=K.acc;ac.BorderSizePixel=0 end
+ local nl=Instance.new("TextButton",r);nl.Size=UDim2.new(1,-18,1,0);nl.BackgroundTransparency=1;nl.TextColor3=idx==execCur and K.txt or K.sub;nl.Font=Enum.Font.Gotham;nl.TextSize=10;nl.TextXAlignment=Enum.TextXAlignment.Left;nl.Text=" "..tab.name;nl.TextTruncate=Enum.TextTruncate.AtEnd
+ local cap=idx
+ nl.MouseButton1Click:Connect(function() execTabs[execCur].code=edTB.Text;execCur=cap;edTB.Text=execTabs[cap].code or "";rfExTabs() end)
+ local xb=Instance.new("TextButton",r);xb.Size=UDim2.new(0,16,0,16);xb.Position=UDim2.new(1,-17,0.5,-8);xb.BackgroundTransparency=1;xb.TextColor3=idx==execCur and K.sub or K.div;xb.Font=Enum.Font.GothamBold;xb.TextSize=11;xb.Text="x"
+ xb.MouseButton1Click:Connect(function()
+ if cap==1 or #execTabs<=1 then showToast(T("tab_err"));return end
+ if execCur==cap then execCur=math.max(1,cap-1) end
+ table.remove(execTabs,cap);if execCur>cap then execCur=execCur-1 end
+ edTB.Text=execTabs[execCur].code or "";saveExecTabs();rfExTabs()
+ end)
+ end
+ end
+ rfExTabs();edTB.Text=execTabs[execCur].code or ""
+ _execTabs=execTabs;_rfExTabs=rfExTabs;_edTB=edTB
+ addTabB.MouseButton1Click:Connect(function()
+ if #execTabs>=200 then showToast(T("max_tabs"));return end
+ execTabs[execCur].code=edTB.Text;table.insert(execTabs,{name="Tab "..(#execTabs+1),code=""});execCur=#execTabs;edTB.Text="";saveExecTabs();rfExTabs()
+ end)
+ -- Bottom divider
+ local bdv=Instance.new("Frame",exPg);bdv.Size=UDim2.new(1,-RS2-1,0,1);bdv.Position=UDim2.new(0,0,1,-BB-1);bdv.BackgroundColor3=K.div;bdv.BorderSizePixel=0
+ -- Bottom bar
+ local botF=Instance.new("Frame",exPg);botF.Size=UDim2.new(1,-RS2-1,0,BB);botF.Position=UDim2.new(0,0,1,-BB);botF.BackgroundColor3=K.sec;botF.BorderSizePixel=0
+ local runB =mkBtn(botF,T("execute"),4,4,70,BB-8,Color3.fromRGB(24,70,30),Color3.fromRGB(80,220,110))
+ local saveB=mkBtn(botF,T("save").."..", 78,4,46,BB-8,Color3.fromRGB(25,45,75),Color3.fromRGB(80,150,230))
+ local clrB =mkBtn(botF,T("clear"),128,4,46,BB-8,Color3.fromRGB(60,22,22),Color3.fromRGB(200,80,80))
+ local cpB =mkBtn(botF,T("copy"),178,4,46,BB-8,K.sec,K.sub)
+ local renB =mkBtn(botF,T("rename"),228,4,54,BB-8,K.sec,K.sub)
+ -- Exec output log (small, above bottom bar)
+ local exLogH=56
+ local exLogDv=Instance.new("Frame",exPg);exLogDv.Size=UDim2.new(1,-RS2-1,0,1);exLogDv.Position=UDim2.new(0,0,1,-BB-exLogH-1);exLogDv.BackgroundColor3=K.div;exLogDv.BorderSizePixel=0
+ local exLogF=Instance.new("Frame",exPg);exLogF.Size=UDim2.new(1,-RS2-1,0,exLogH);exLogF.Position=UDim2.new(0,0,1,-BB-exLogH);exLogF.BackgroundColor3=K.bg;exLogF.BorderSizePixel=0
+ -- resize editor to fit
+ edF.Size=UDim2.new(1,-RS2-1,1,-BB-exLogH-2)
+ local exLL=Instance.new("UIListLayout",exLogF);exLL.SortOrder=Enum.SortOrder.LayoutOrder;exLL.VerticalAlignment=Enum.VerticalAlignment.Bottom
+ local exLls={};local exLogText=""
+ local function addExLog(m,c2)
+ exLogText=exLogText..(exLogText=="" and "" or "\n")..m
+ local tl=Instance.new("TextLabel",exLogF);tl.Size=UDim2.new(1,-6,0,13);tl.BackgroundTransparency=1;tl.Font=Enum.Font.Code;tl.TextSize=10;tl.TextXAlignment=Enum.TextXAlignment.Left;tl.TextTruncate=Enum.TextTruncate.AtEnd;tl.TextTransparency=0.65;tl.TextColor3=c2 or K.sub;tl.Text=" "..m
+ TS:Create(tl,TweenInfo.new(.3,Enum.EasingStyle.Exponential),{TextTransparency=0}):Play()
+ table.insert(exLls,tl);if #exLls>4 then exLls[1]:Destroy();table.remove(exLls,1) end
+ end
+ -- Hook print/warn/error for exec context
+ local origPrint=print
+ -- Button actions
+ runB.MouseButton1Click:Connect(function()
+ execTabs[execCur].code=edTB.Text;exLogText=""
+ if not loadstring then addExLog("[E] loadstring unavailable",K.red);return end
+ local fn,se=loadstring(edTB.Text)
+ if not fn then addExLog("[E] "..tostring(se):sub(1,60),K.red);return end
+ local ok,re=pcall(fn)
+ if not ok then addExLog("[E] "..tostring(re):sub(1,60),K.red)
+ else addExLog("[OK] "..T("execute"),K.grn) end
+ end)
+ saveB.MouseButton1Click:Connect(function() execTabs[execCur].code=edTB.Text;saveExecTabs();showToast(T("save")..": OK",true) end)
+ clrB.MouseButton1Click:Connect(function() edTB.Text="";addExLog("[~] "..T("clear"),K.sub) end)
+ cpB.MouseButton1Click:Connect(function() copyText(edTB.Text);showToast(T("copied"),true) end)
+ -- Rename current tab
+ local renInput=Instance.new("TextBox",exPg);renInput.Size=UDim2.new(0,120,0,22);renInput.Position=UDim2.new(0,4,1,-BB-24);renInput.BackgroundColor3=K.sec;renInput.BorderSizePixel=0;renInput.TextColor3=K.txt;renInput.Font=Enum.Font.Gotham;renInput.TextSize=11;renInput.PlaceholderText="New tab name...";renInput.PlaceholderColor3=K.sub;renInput.ClearTextOnFocus=true;renInput.Text="";renInput.Visible=false
+ Instance.new("UICorner",renInput).CornerRadius=UDim.new(0,5)
+ renB.MouseButton1Click:Connect(function()
+  renInput.Visible=not renInput.Visible
+  if renInput.Visible then renInput.Text=execTabs[execCur].name;renInput:CaptureFocus() end
+ end)
+ renInput.FocusLost:Connect(function(enter)
+  if enter and renInput.Text~="" then execTabs[execCur].name=renInput.Text;rfExTabs() end
+  renInput.Visible=false
+ end)
+ end
+
+
+ -- ===== Search page =====
+ do
+  local SB_BASE="https://scriptblox.com/api/script/"
+  local RS_BASE="https://rscripts.net/api/v2/"
+  local useAPI=1  -- 1=ScriptBlox 2=Rscripts
+  local HEADER_H=44;local BOT_H=0
+
+  -- Header bar
+  local srchHdr=Instance.new("Frame",srchPg);srchHdr.Size=UDim2.new(1,0,0,HEADER_H);srchHdr.BackgroundColor3=K.sec;srchHdr.BorderSizePixel=0
+  local srchDv=Instance.new("Frame",srchPg);srchDv.Size=UDim2.new(1,0,0,1);srchDv.Position=UDim2.new(0,0,0,HEADER_H);srchDv.BackgroundColor3=K.div;srchDv.BorderSizePixel=0
+  -- Search TextBox
+  local srchTB=Instance.new("TextBox",srchHdr);srchTB.Size=UDim2.new(1,-78,1,-10);srchTB.Position=UDim2.new(0,6,0,5);srchTB.BackgroundColor3=K.bg;srchTB.BorderSizePixel=0;srchTB.TextColor3=K.txt;srchTB.Font=Enum.Font.Gotham;srchTB.TextSize=12;srchTB.PlaceholderText=T("search_ph");srchTB.PlaceholderColor3=K.sub;srchTB.ClearTextOnFocus=false;srchTB.Text=""
+  Instance.new("UICorner",srchTB).CornerRadius=UDim.new(0,6)
+  -- API toggle button
+  local apiNames={"ScriptBlox","Rscripts"}
+  local apiBtn=mkBtn(srchHdr,"SB",srchHdr.AbsoluteSize.X-70,5,62,HEADER_H-10,K.accD,K.acc)
+  apiBtn.Position=UDim2.new(1,-68,0,5);apiBtn.Text="SB"
+  apiBtn.MouseButton1Click:Connect(function()
+   useAPI=useAPI==1 and 2 or 1
+   apiBtn.Text=useAPI==1 and "SB" or "RS"
+   TS:Create(apiBtn,TweenInfo.new(.15),{BackgroundColor3=useAPI==1 and K.accD or Color3.fromRGB(60,40,15)}):Play()
+  end)
+
+  -- Results ScrollingFrame
+  local resSF=Instance.new("ScrollingFrame",srchPg);resSF.Size=UDim2.new(1,0,1,-HEADER_H-1);resSF.Position=UDim2.new(0,0,0,HEADER_H+1);resSF.BackgroundColor3=K.bg;resSF.BorderSizePixel=0;resSF.ScrollBarThickness=3;resSF.ScrollBarImageColor3=K.acc;resSF.AutomaticCanvasSize=Enum.AutomaticSize.Y;resSF.CanvasSize=UDim2.new(0,0,0,0)
+  Instance.new("UIListLayout",resSF).SortOrder=Enum.SortOrder.LayoutOrder
+
+  -- Modal overlay (script preview)
+  local modal=Instance.new("Frame",srchPg);modal.Size=UDim2.fromScale(1,1);modal.Position=UDim2.fromScale(0,0);modal.BackgroundColor3=Color3.fromRGB(0,0,0);modal.BackgroundTransparency=0.4;modal.BorderSizePixel=0;modal.Visible=false;modal.ZIndex=20
+  local mCard=Instance.new("Frame",modal);mCard.Size=UDim2.new(1,-20,0,220);mCard.AnchorPoint=Vector2.new(.5,.5);mCard.Position=UDim2.new(.5,0,.5,0);mCard.BackgroundColor3=K.panel;mCard.BorderSizePixel=0;mCard.ZIndex=21
+  Instance.new("UICorner",mCard).CornerRadius=UDim.new(0,10)
+  Instance.new("UIStroke",mCard).Color=K.div
+  -- Modal header
+  local mTitle=Instance.new("TextLabel",mCard);mTitle.Size=UDim2.new(1,-40,0,18);mTitle.Position=UDim2.new(0,10,0,8);mTitle.BackgroundTransparency=1;mTitle.TextColor3=K.txt;mTitle.Font=Enum.Font.GothamBold;mTitle.TextSize=12;mTitle.TextXAlignment=Enum.TextXAlignment.Left;mTitle.Text="";mTitle.ZIndex=22
+  local mGame=Instance.new("TextLabel",mCard);mGame.Size=UDim2.new(1,-40,0,13);mGame.Position=UDim2.new(0,10,0,26);mGame.BackgroundTransparency=1;mGame.TextColor3=K.sub;mGame.Font=Enum.Font.Gotham;mGame.TextSize=10;mGame.TextXAlignment=Enum.TextXAlignment.Left;mGame.Text="";mGame.ZIndex=22
+  -- Close btn
+  local mClose=Instance.new("TextButton",mCard);mClose.Size=UDim2.new(0,24,0,24);mClose.Position=UDim2.new(1,-28,0,6);mClose.BackgroundColor3=K.sec;mClose.BorderSizePixel=0;mClose.AutoButtonColor=false;mClose.TextColor3=K.sub;mClose.Font=Enum.Font.GothamBold;mClose.TextSize=14;mClose.Text="x";mClose.ZIndex=22
+  Instance.new("UICorner",mClose).CornerRadius=UDim.new(0,6)
+  -- Preview code box
+  local mDv=Instance.new("Frame",mCard);mDv.Size=UDim2.new(1,-20,0,1);mDv.Position=UDim2.new(0,10,0,44);mDv.BackgroundColor3=K.div;mDv.BorderSizePixel=0;mDv.ZIndex=22
+  local mPrev=Instance.new("TextLabel",mCard);mPrev.Size=UDim2.new(1,-20,0,105);mPrev.Position=UDim2.new(0,10,0,48);mPrev.BackgroundColor3=K.bg;mPrev.BorderSizePixel=0;mPrev.TextColor3=Color3.fromRGB(170,210,170);mPrev.Font=Enum.Font.Code;mPrev.TextSize=10;mPrev.TextXAlignment=Enum.TextXAlignment.Left;mPrev.TextYAlignment=Enum.TextYAlignment.Top;mPrev.TextWrapped=true;mPrev.Text="Loading...";mPrev.ZIndex=22
+  Instance.new("UICorner",mPrev).CornerRadius=UDim.new(0,5)
+  -- Action buttons row
+  local mBotY=160
+  local mExec=mkBtn(mCard,T("execute"),10,mBotY,72,26,Color3.fromRGB(24,70,30),Color3.fromRGB(80,220,110));mExec.ZIndex=22
+  local mSave=mkBtn(mCard,T("save_tab"),86,mBotY,84,26,Color3.fromRGB(25,45,75),Color3.fromRGB(80,150,230));mSave.ZIndex=22
+  local mCopy=mkBtn(mCard,T("copy"),174,mBotY,52,26,K.sec,K.sub);mCopy.ZIndex=22
+  local mKeyWarn=Instance.new("TextLabel",mCard);mKeyWarn.Size=UDim2.new(1,-20,0,14);mKeyWarn.Position=UDim2.new(0,10,0,190);mKeyWarn.BackgroundTransparency=1;mKeyWarn.TextColor3=K.ylw;mKeyWarn.Font=Enum.Font.Gotham;mKeyWarn.TextSize=9;mKeyWarn.Text="";mKeyWarn.ZIndex=22
+
+  local currentCode=""
+  local currentName=""
+  local function openModal(name,game2,rawCode,hasKey)
+   currentCode=rawCode or "";currentName=name or "Script"
+   mTitle.Text=name or "Script";mGame.Text=game2 or ""
+   mPrev.Text=currentCode~="" and currentCode:sub(1,400)..(#currentCode>400 and "..." or "") or "-- Preview not available"
+   mKeyWarn.Text=hasKey and "! This script may require a key" or ""
+   local TI_M=TweenInfo.new(.3,Enum.EasingStyle.Exponential)
+   modal.BackgroundTransparency=1;mCard.BackgroundTransparency=1
+   for _,c in ipairs(mCard:GetChildren()) do
+    if c:IsA("TextLabel") then c.TextTransparency=1
+    elseif c:IsA("TextButton") then c.BackgroundTransparency=1;c.TextTransparency=1 end
+   end
+   modal.Visible=true
+   TS:Create(modal,TI_M,{BackgroundTransparency=0.4}):Play()
+   TS:Create(mCard,TI_M,{BackgroundTransparency=0}):Play()
+   for _,c in ipairs(mCard:GetChildren()) do
+    if c:IsA("TextLabel") then TS:Create(c,TI_M,{TextTransparency=0}):Play()
+    elseif c:IsA("TextButton") then TS:Create(c,TI_M,{BackgroundTransparency=0.35,TextTransparency=0}):Play() end
+   end
+  end
+  local function closeModal()
+   local TI_MC=TweenInfo.new(.25,Enum.EasingStyle.Exponential)
+   TS:Create(modal,TI_MC,{BackgroundTransparency=1}):Play()
+   TS:Create(mCard,TI_MC,{BackgroundTransparency=1}):Play()
+   task.delay(.26,function() modal.Visible=false end)
+  end
+  mClose.MouseButton1Click:Connect(closeModal)
+  modal.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then closeModal() end end)
+  -- mCard blocks click-through via ZIndex
+
+  mExec.MouseButton1Click:Connect(function()
+   if currentCode=="" then return end
+   if not loadstring then return end
+   local fn,e=loadstring(currentCode)
+   if not fn then closeModal();return end
+   closeModal();task.delay(.18,function() pcall(fn) end)
+  end)
+  mSave.MouseButton1Click:Connect(function()
+   if currentCode=="" then return end
+   if saveToExec(currentName:sub(1,20),currentCode) then
+    closeModal()
+   end
+  end)
+  mCopy.MouseButton1Click:Connect(function()
+   copyText(currentCode)
+   mCopy.Text=T("copied");task.delay(1.2,function() if mCopy and mCopy.Parent then mCopy.Text=T("copy") end end)
+  end)
+
+  -- Result card builder
+  local function mkResult(parent,name,game2,views,verified,hasKey,getCode)
+   local r=Instance.new("Frame",parent);r.Size=UDim2.new(1,0,0,50);r.BackgroundColor3=K.row;r.BorderSizePixel=0
+   local dv=Instance.new("Frame",r);dv.Size=UDim2.new(1,-12,0,1);dv.Position=UDim2.new(0,6,1,-1);dv.BackgroundColor3=K.div;dv.BorderSizePixel=0
+   -- Left: name + game
+   local nl=Instance.new("TextLabel",r);nl.Size=UDim2.new(1,-52,0,18);nl.Position=UDim2.new(0,10,0,7);nl.BackgroundTransparency=1;nl.TextColor3=K.txt;nl.Font=Enum.Font.GothamBold;nl.TextSize=11;nl.TextXAlignment=Enum.TextXAlignment.Left;nl.TextTruncate=Enum.TextTruncate.AtEnd;nl.Text=name
+   local gl=Instance.new("TextLabel",r);gl.Size=UDim2.new(1,-52,0,13);gl.Position=UDim2.new(0,10,0,26);gl.BackgroundTransparency=1;gl.TextColor3=K.sub;gl.Font=Enum.Font.Gotham;gl.TextSize=10;gl.TextXAlignment=Enum.TextXAlignment.Left;gl.TextTruncate=Enum.TextTruncate.AtEnd;gl.Text=game2
+   -- Badges
+   if verified then
+    local vb=Instance.new("TextLabel",r);vb.Size=UDim2.new(0,18,0,14);vb.Position=UDim2.new(1,-48,0,8);vb.BackgroundColor3=K.accD;vb.BorderSizePixel=0;vb.TextColor3=K.acc;vb.Font=Enum.Font.GothamBold;vb.TextSize=8;vb.Text="V";Instance.new("UICorner",vb).CornerRadius=UDim.new(0,3)
+   end
+   if hasKey then
+    local kb=Instance.new("TextLabel",r);kb.Size=UDim2.new(0,20,0,14);kb.Position=UDim2.new(1,-48,0,27);kb.BackgroundColor3=Color3.fromRGB(60,40,10);kb.BorderSizePixel=0;kb.TextColor3=K.ylw;kb.Font=Enum.Font.GothamBold;kb.TextSize=7;kb.Text="KEY";Instance.new("UICorner",kb).CornerRadius=UDim.new(0,3)
+   end
+   -- Views
+   local vl2=Instance.new("TextLabel",r);vl2.Size=UDim2.new(0,40,1,0);vl2.Position=UDim2.new(1,-44,0,0);vl2.BackgroundTransparency=1;vl2.TextColor3=K.sub;vl2.Font=Enum.Font.Gotham;vl2.TextSize=9;vl2.TextXAlignment=Enum.TextXAlignment.Right;vl2.Text=views and (tostring(math.floor(views/1000)).."k") or ""
+   -- Click handler
+   local btn=Instance.new("TextButton",r);btn.Size=UDim2.fromScale(1,1);btn.BackgroundTransparency=1;btn.Text=""
+   btn.MouseButton1Click:Connect(function()
+    openModal(name,game2,"Loading...",hasKey)
+    task.spawn(function()
+     local ok,code=pcall(getCode)
+     if ok and code and code~="" then
+      currentCode=code
+      if mPrev and mPrev.Parent then
+       mPrev.Text=code:sub(1,400)..(#code>400 and "..." or "")
+      end
+     else
+      if mPrev and mPrev.Parent then mPrev.Text="-- Could not load script" end
+     end
+    end)
+   end)
+   -- fade in
+   r.BackgroundTransparency=1;TS:Create(r,TweenInfo.new(.2,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{BackgroundTransparency=0}):Play()
+   return r
+  end
+
+  -- Status label
+  local statusLbl=Instance.new("TextLabel",resSF);statusLbl.Size=UDim2.new(1,0,0,30);statusLbl.BackgroundTransparency=1;statusLbl.TextColor3=K.sub;statusLbl.Font=Enum.Font.Gotham;statusLbl.TextSize=11;statusLbl.Text=T("trending");statusLbl.LayoutOrder=0
+
+  -- Clear results
+  local function clearResults()
+   for _,c in ipairs(resSF:GetChildren()) do
+    if c:IsA("Frame") and c~=modal then c:Destroy() end
+   end
+   statusLbl.Parent=resSF;statusLbl.LayoutOrder=0
+  end
+
+  -- Parse and display results
+  local function showSBResults(data,isTrend)
+   clearResults()
+   local scripts=(isTrend and data.result and data.result.scripts) or (data.result and data.result.scripts) or {}
+   if #scripts==0 then statusLbl.Text=T("no_res");return end
+   statusLbl.Text=""
+   for i,sc in ipairs(scripts) do
+    local sname=sc.title or "Unknown"
+    local gname=sc.game and sc.game.name or "Unknown Game"
+    local views=sc.views or 0
+    local verified=sc.verified or false
+    local hasKey=sc.keySystem or false
+    local rawScript=sc.script or ""
+    local rawURL=rawScript=="" and sc.rawScript or nil
+    local ord=i
+    local r=mkResult(resSF,sname,gname,views,verified,hasKey,function()
+     if rawScript~="" then return rawScript end
+     if rawURL then return game:HttpGet(rawURL) end
+     return ""
+    end)
+    r.LayoutOrder=ord
+   end
+  end
+
+  local function showRSResults(data)
+   clearResults()
+   local scripts=data.scripts or {}
+   if #scripts==0 then statusLbl.Text="No results found.";return end
+   statusLbl.Text=""
+   for i,sc in ipairs(scripts) do
+    local sname=sc.title or "Unknown"
+    local gname=sc.game and sc.game.name or "Unknown Game"
+    local views=sc.views or 0
+    local verified=sc.verified or false
+    local hasKey=sc.keySystem or false
+    local rawURL=sc.rawScript or ""
+    local ord=i
+    local r=mkResult(resSF,sname,gname,views,verified,hasKey,function()
+     if rawURL~="" then return game:HttpGet(rawURL) end
+     return ""
+    end)
+    r.LayoutOrder=ord
+   end
+  end
+
+  local function doSearch(q)
+   clearResults();statusLbl.Text=T("searching")
+   task.spawn(function()
+    if useAPI==1 then
+     local url=SB_BASE.."search?q="..q:gsub(" ","%%20").."&max=20"
+     local ok,raw=pcall(game.HttpGet,game,url)
+     if not ok then statusLbl.Text="Error: "..tostring(raw):sub(1,40);return end
+     local ok2,data=pcall(HS.JSONDecode,HS,raw)
+     if ok2 then showSBResults(data,false) else statusLbl.Text="Parse error" end
+    else
+     local url=RS_BASE.."scripts?q="..q:gsub(" ","%%20").."&page=1&orderBy=date&sort=desc"
+     local ok,raw=pcall(game.HttpGet,game,url)
+     if not ok then statusLbl.Text="Error: "..tostring(raw):sub(1,40);return end
+     local ok2,data=pcall(HS.JSONDecode,HS,raw)
+     if ok2 then showRSResults(data) else statusLbl.Text="Parse error" end
+    end
+   end)
+  end
+
+  local function loadTrending()
+   clearResults();statusLbl.Text="Loading trending..."
+   task.spawn(function()
+    if useAPI==1 then
+     local ok,raw=pcall(game.HttpGet,game,SB_BASE.."fetch?page=1")
+     if not ok then statusLbl.Text=T("need_http");return end
+     local ok2,data=pcall(HS.JSONDecode,HS,raw)
+     if ok2 then showSBResults(data,true) else statusLbl.Text="Parse error" end
+    else
+     local ok,raw=pcall(game.HttpGet,game,RS_BASE.."trending")
+     if not ok then statusLbl.Text="Need HttpGet support";return end
+     local ok2,data=pcall(HS.JSONDecode,HS,raw)
+     if ok2 then showRSResults(data) else statusLbl.Text="Parse error" end
+    end
+   end)
+  end
+
+  srchTB.FocusLost:Connect(function(enter)
+   if enter or (mob and srchTB.Text~="") then
+    local q=srchTB.Text
+    if q=="" then loadTrending() else doSearch(q) end
+   end
+  end)
+
+  -- Load trending when tab opened
+  tbs["srch"].b.MouseButton1Click:Connect(function() task.delay(.1,loadTrending) end)
+  -- Initial load if tab is default (it won't be, but just in case)
+ end
+
+ -- ===== Log page =====
+ do
+ local lgAll={} -- mirror of logBuf with UI labels
+ local lgContainer=Instance.new("Frame",lgPg);lgContainer.Size=UDim2.new(1,0,1,-28);lgContainer.BackgroundColor3=K.bg;lgContainer.BorderSizePixel=0
+ local lgSF=Instance.new("ScrollingFrame",lgContainer);lgSF.Size=UDim2.fromScale(1,1);lgSF.BackgroundTransparency=1;lgSF.BorderSizePixel=0;lgSF.ScrollBarThickness=3;lgSF.ScrollBarImageColor3=K.acc;lgSF.AutomaticCanvasSize=Enum.AutomaticSize.Y;lgSF.CanvasSize=UDim2.new(0,0,0,0)
+ local lgLayout=Instance.new("UIListLayout",lgSF);lgLayout.SortOrder=Enum.SortOrder.LayoutOrder;lgLayout.VerticalAlignment=Enum.VerticalAlignment.Bottom
+ -- Bottom bar
+ local lgBot=Instance.new("Frame",lgPg);lgBot.Size=UDim2.new(1,0,0,28);lgBot.Position=UDim2.new(0,0,1,-28);lgBot.BackgroundColor3=K.sec;lgBot.BorderSizePixel=0
+ local lgDv=Instance.new("Frame",lgPg);lgDv.Size=UDim2.new(1,0,0,1);lgDv.Position=UDim2.new(0,0,1,-29);lgDv.BackgroundColor3=K.div;lgDv.BorderSizePixel=0
+ local cpLog=mkBtn(lgBot,T("copy_log"),4,4,70,20,K.accD,K.acc)
+ local clrLog=mkBtn(lgBot,T("clear"),78,4,48,20,Color3.fromRGB(60,22,22),K.red)
+ local lgBuf2={}
+ local function addLgLine(msg,mt)
+ local c=mt==Enum.MessageType.MessageWarning and K.ylw or mt==Enum.MessageType.MessageError and K.red or K.sub
+ local prefix=mt==Enum.MessageType.MessageWarning and "[W] " or mt==Enum.MessageType.MessageError and "[E] " or "[I] "
+ local full=prefix..msg
+ table.insert(lgBuf2,full)
+ if #lgBuf2>300 then table.remove(lgBuf2,1) end
+ local tl=Instance.new("TextLabel",lgSF);tl.Size=UDim2.new(1,-6,0,13);tl.BackgroundTransparency=1;tl.Font=Enum.Font.Code;tl.TextSize=10;tl.TextXAlignment=Enum.TextXAlignment.Left;tl.TextWrapped=false;tl.TextTruncate=Enum.TextTruncate.AtEnd;tl.TextColor3=K.bg;tl.Text=" "..full;tl.LayoutOrder=#lgBuf2
+ TS:Create(tl,TweenInfo.new(.18,Enum.EasingStyle.Exponential,Enum.EasingDirection.Out),{TextColor3=c}):Play()
+ tl.TextTransparency=0.7
+ TS:Create(tl,TweenInfo.new(.3,Enum.EasingStyle.Exponential),{TextTransparency=0}):Play()
+ end
+ -- Populate from existing buffer
+ for i=#logBuf,1,-1 do addLgLine(logBuf[i].t:sub(5),logBuf[i].k) end -- skip prefix (already added)
+ -- Live updates
+ pcall(function()
+ game:GetService("LogService").MessageOut:Connect(function(msg,mt) addLgLine(msg,mt) end)
+ end)
+ cpLog.MouseButton1Click:Connect(function() copyText(table.concat(lgBuf2,"\n"));cpLog.Text="Copied!";task.delay(1.2,function() cpLog.Text="Copy Log" end) end)
+ clrLog.MouseButton1Click:Connect(function() for _,c in ipairs(lgSF:GetChildren()) do if c:IsA("TextLabel") then c:Destroy() end end;lgBuf2={} end)
+ end
+
+ -- ===== Credits page =====
+ local function mkC(txt,sz,c2)
+ local f=Instance.new("Frame",crePg);f.Size=UDim2.new(1,0,0,sz+8);f.BackgroundTransparency=1;f.BorderSizePixel=0
+ local tl=Instance.new("TextLabel",f);tl.Size=UDim2.new(1,-16,1,0);tl.Position=UDim2.new(0,8,0,0);tl.BackgroundTransparency=1;tl.TextColor3=c2 or K.txt;tl.Font=Enum.Font.Gotham;tl.TextSize=sz;tl.TextXAlignment=Enum.TextXAlignment.Left;tl.Text=txt
+ end
+ -- User card at top of credits
+ local userCard=Instance.new("Frame",crePg);userCard.Size=UDim2.new(1,0,0,60);userCard.BackgroundColor3=K.row;userCard.BorderSizePixel=0
+ local ucAv=Instance.new("Frame",userCard);ucAv.Size=UDim2.new(0,42,0,42);ucAv.Position=UDim2.new(0,10,0.5,-21);ucAv.BackgroundColor3=K.sec;ucAv.BorderSizePixel=0;Instance.new("UICorner",ucAv).CornerRadius=UDim.new(1,0);Instance.new("UIStroke",ucAv).Color=K.div
+ local ucImg=Instance.new("ImageLabel",ucAv);ucImg.Size=UDim2.fromScale(1,1);ucImg.BackgroundTransparency=1;ucImg.ScaleType=Enum.ScaleType.Fit;ucImg.Image="";Instance.new("UICorner",ucImg).CornerRadius=UDim.new(1,0)
+ local ucDisp=Instance.new("TextLabel",userCard);ucDisp.Size=UDim2.new(1,-70,0,20);ucDisp.Position=UDim2.new(0,60,0,10);ucDisp.BackgroundTransparency=1;ucDisp.TextColor3=K.txt;ucDisp.Font=Enum.Font.GothamBold;ucDisp.TextSize=13;ucDisp.TextXAlignment=Enum.TextXAlignment.Left;ucDisp.Text=LP.DisplayName
+ local ucUser=Instance.new("TextLabel",userCard);ucUser.Size=UDim2.new(1,-70,0,14);ucUser.Position=UDim2.new(0,60,0,32);ucUser.BackgroundTransparency=1;ucUser.TextColor3=K.sub;ucUser.Font=Enum.Font.Gotham;ucUser.TextSize=10;ucUser.TextXAlignment=Enum.TextXAlignment.Left;ucUser.Text="@"..LP.Name
+ -- Load avatar
+ task.spawn(function()
+  local ok,url=pcall(function() return PL:GetUserThumbnailAsync(LP.UserId,Enum.ThumbnailType.HeadShot,Enum.ThumbnailSize.Size48x48) end)
+  if ok and url~="" then if ucImg and ucImg.Parent then ucImg.Image=url end end
+ end)
+ mkC("AIO Hub",16,K.txt);mkC("All in One Hub",11,K.acc)
+ mkC("",6,K.sub)
+ mkC("Built with Claude AI (claude-sonnet-4-6)",11,K.sub)
+ mkC("",6,K.sub)
+ mkC("Infinite Yield by edge_case#4773",11,K.sub)
+ mkC("SimpleSpy by 78n",11,K.sub)
+ mkC("DEX by Moon/LorekeeperZinnia",11,K.sub)
+ mkC("Console by wally-rblx",11,K.sub)
+ mkC("AudioLogger & VR by EdgeIY / 0866",11,K.sub)
+ mkC("",6,K.sub)
+ mkC(T("risk"),11,K.red)
+
+ -- vietanh credit card
+ local vaCard=Instance.new("Frame",crePg);vaCard.Size=UDim2.new(1,0,0,46);vaCard.BackgroundColor3=K.row;vaCard.BorderSizePixel=0
+ Instance.new("UIStroke",vaCard).Color=K.acc
+ Instance.new("UICorner",vaCard).CornerRadius=UDim.new(0,6)
+ local vaName=Instance.new("TextLabel",vaCard);vaName.Size=UDim2.new(1,-12,0,18);vaName.Position=UDim2.new(0,10,0,5);vaName.BackgroundTransparency=1;vaName.TextColor3=K.acc;vaName.Font=Enum.Font.GothamBold;vaName.TextSize=13;vaName.TextXAlignment=Enum.TextXAlignment.Left;vaName.Text="vietanh"
+ local vaRole=Instance.new("TextLabel",vaCard);vaRole.Size=UDim2.new(1,-12,0,14);vaRole.Position=UDim2.new(0,10,0,25);vaRole.BackgroundTransparency=1;vaRole.TextColor3=K.sub;vaRole.Font=Enum.Font.Gotham;vaRole.TextSize=10;vaRole.TextXAlignment=Enum.TextXAlignment.Left;vaRole.Text="Prompt Engineering, QA & Bug Hunting"
+
+ -- ===== Mobile FAB =====
+ if mob then
+ local fsg=Instance.new("ScreenGui",LP.PlayerGui);fsg.Name="AIO_FAB";fsg.ResetOnSpawn=false;fsg.IgnoreGuiInset=true;fsg.DisplayOrder=101
+ local FAB=Instance.new("TextButton",fsg);FAB.Size=UDim2.new(0,56,0,56);FAB.Position=UDim2.new(0,14,1,-74);FAB.BackgroundColor3=K.panel;FAB.BorderSizePixel=0;FAB.AutoButtonColor=false;FAB.Text=""
+ Instance.new("UICorner",FAB).CornerRadius=UDim.new(0,14);local fs=Instance.new("UIStroke",FAB);fs.Color=K.acc;fs.Thickness=1.2
+  local fabT=Instance.new("TextLabel",FAB);fabT.Size=UDim2.new(1,0,0,22);fabT.Position=UDim2.new(0,0,0.5,-14);fabT.BackgroundTransparency=1;fabT.TextColor3=K.acc;fabT.Font=Enum.Font.GothamBold;fabT.TextSize=16;fabT.Text="AIO"
+  local fabS=Instance.new("TextLabel",FAB);fabS.Size=UDim2.new(1,0,0,11);fabS.Position=UDim2.new(0,0,1,-13);fabS.BackgroundTransparency=1;fabS.TextColor3=K.sub;fabS.Font=Enum.Font.Gotham;fabS.TextSize=9;fabS.Text="Hub"
+ local aI,fP,tP2=nil,nil,nil
+ FAB.InputBegan:Connect(function(i) if i.UserInputType~=Enum.UserInputType.Touch then return end;aI=i;fP=FAB.Position;tP2=Vector2.new(i.Position.X,i.Position.Y) end)
+ FAB.InputChanged:Connect(function(i) if i~=aI then return end;FAB.Position=UDim2.new(fP.X.Scale,fP.X.Offset+(i.Position.X-tP2.X),fP.Y.Scale,fP.Y.Offset+(i.Position.Y-tP2.Y)) end)
+ FAB.InputEnded:Connect(function(i)
+ if i~=aI then return end
+ if math.abs(i.Position.X-tP2.X)<10 and math.abs(i.Position.Y-tP2.Y)<10 then
+ local op=not panel.Visible
+ if op then
+  panelShow(panel)
+ else
+  panelHide(panel)
+ end
+ TS:Create(FAB,TweenInfo.new(.15,Enum.EasingStyle.Exponential),{BackgroundColor3=op and K.sel or K.panel}):Play()
+ aI=nil
+  end
+ end)
+ end
+
+ -- Keybinds
+ UIS.InputBegan:Connect(function(i,g)
+ if g then return end;local k=i.KeyCode
+ if k==Enum.KeyCode.Z then C.on=not C.on;if not C.on then clrAll() end
+ elseif k==Enum.KeyCode.X then C.player=not C.player
+ elseif k==Enum.KeyCode.C then C.entity=not C.entity
+ elseif k==Enum.KeyCode.V then C.object=not C.object
+ elseif k==Enum.KeyCode.B then C.info=not C.info;if not C.info then clrBB() end
+ elseif k==Enum.KeyCode.N then C.hitbox=not C.hitbox;if not C.hitbox then clrHB() end
+ elseif k==Enum.KeyCode.G then C.aimOn=not C.aimOn;makeFov()
+ end
+ end)
+end
+
+-- Return library
+return _AIOLib
