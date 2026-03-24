@@ -1,9 +1,14 @@
 -- AIOLib.lua | AIO Hub UI Library
--- Drop-in UI for AIO Hub: palette, localization, widgets, buildUI
--- Requires: TS, UIS, PL, LP (passed from host script via AIOLib.init)
--- Usage: local Lib = loadstring(game:HttpGet(LIB_URL))()
+-- Usage: local Lib = loadstring(game:HttpGet(LIB_URL, true))()
 --        Lib.init({ C=C, runCmd=runCmd, waypoints=waypoints, ... })
 local _AIOLib = {}
+
+-- Services (lib is self-contained, no dependency on host script)
+local TS  = game:GetService("TweenService")
+local UIS = game:GetService("UserInputService")
+local PL  = game:GetService("Players")
+local HS  = game:GetService("HttpService")
+local LP  = PL.LocalPlayer
 
 -- UI palette - refined
 local K={
@@ -580,7 +585,7 @@ local function buildUI()  -- called by init()
   local srchHdr=Instance.new("Frame",srchPg);srchHdr.Size=UDim2.new(1,0,0,HEADER_H);srchHdr.BackgroundColor3=K.sec;srchHdr.BorderSizePixel=0
   local srchDv=Instance.new("Frame",srchPg);srchDv.Size=UDim2.new(1,0,0,1);srchDv.Position=UDim2.new(0,0,0,HEADER_H);srchDv.BackgroundColor3=K.div;srchDv.BorderSizePixel=0
   -- Search TextBox
-  local srchTB=Instance.new("TextBox",srchHdr);srchTB.Size=UDim2.new(1,-78,1,-10);srchTB.Position=UDim2.new(0,6,0,5);srchTB.BackgroundColor3=K.bg;srchTB.BorderSizePixel=0;srchTB.TextColor3=K.txt;srchTB.Font=Enum.Font.Gotham;srchTB.TextSize=12;srchTB.PlaceholderText=T("search_ph");srchTB.PlaceholderColor3=K.sub;srchTB.ClearTextOnFocus=false;srchTB.Text=""
+  local srchTB=Instance.new("TextBox",srchHdr);srchTB.Size=UDim2.new(0,6,0,5);srchTB.BackgroundColor3=K.bg;srchTB.BorderSizePixel=0;srchTB.TextColor3=K.txt;srchTB.Font=Enum.Font.Gotham;srchTB.TextSize=12;srchTB.PlaceholderText=T("search_ph");srchTB.PlaceholderColor3=K.sub;srchTB.ClearTextOnFocus=false;srchTB.Text=""
   Instance.new("UICorner",srchTB).CornerRadius=UDim.new(0,6)
   -- API toggle button
   local apiNames={"ScriptBlox","Rscripts"}
