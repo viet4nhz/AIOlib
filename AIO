@@ -147,6 +147,9 @@ end
 -- Config injected by Lib.init()
 local _cfg = {}
 
+-- Forward declarations (must exist before init captures them as upvalues)
+local panelHide, panelShow, buildUI
+
 function _AIOLib.init(cfg)
  _cfg = cfg or {}
  -- Inject into buildUI scope
@@ -168,19 +171,19 @@ end
 -- CanvasGroup approach: GroupTransparency tweens entire panel as one layer
 -- Roblox docs: "tween GroupTransparency to affect object's overall transparency"
 -- No per-child tweening needed = smooth, no gray bleed, no jank
-local function panelHide(p)
+panelHide = function(p)
  -- Fade out: GroupTransparency 0?1 then hide
  TS:Create(p,TweenInfo.new(0.28,Enum.EasingStyle.Quint,Enum.EasingDirection.In),
   {GroupTransparency=1}):Play()
  task.delay(0.3,function() if p and p.Parent then p.Visible=false;p.GroupTransparency=0 end end)
 end
-local function panelShow(p)
+panelShow = function(p)
  -- Fade in: show then GroupTransparency 1?0
  p.GroupTransparency=1;p.Visible=true
  TS:Create(p,TweenInfo.new(0.35,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),
   {GroupTransparency=0}):Play()
 end
-local function buildUI()  -- called by init()
+buildUI = function()  -- called by init()
  local old=LP.PlayerGui:FindFirstChild("AIO_UI");if old then old:Destroy() end
  local oldF=LP.PlayerGui:FindFirstChild("AIO_FAB");if oldF then oldF:Destroy() end
  local mob=UIS.TouchEnabled
@@ -585,7 +588,7 @@ local function buildUI()  -- called by init()
   local srchHdr=Instance.new("Frame",srchPg);srchHdr.Size=UDim2.new(1,0,0,HEADER_H);srchHdr.BackgroundColor3=K.sec;srchHdr.BorderSizePixel=0
   local srchDv=Instance.new("Frame",srchPg);srchDv.Size=UDim2.new(1,0,0,1);srchDv.Position=UDim2.new(0,0,0,HEADER_H);srchDv.BackgroundColor3=K.div;srchDv.BorderSizePixel=0
   -- Search TextBox
-  local srchTB=Instance.new("TextBox",srchHdr);srchTB.Size=UDim2.new(0,6,0,5);srchTB.BackgroundColor3=K.bg;srchTB.BorderSizePixel=0;srchTB.TextColor3=K.txt;srchTB.Font=Enum.Font.Gotham;srchTB.TextSize=12;srchTB.PlaceholderText=T("search_ph");srchTB.PlaceholderColor3=K.sub;srchTB.ClearTextOnFocus=false;srchTB.Text=""
+  local srchTB=Instance.new("TextBox",srchHdr);srchTB.Size=UDim2.new(1,-78,1,-10);srchTB.Position=UDim2.new(0,6,0,5);srchTB.BackgroundColor3=K.bg;srchTB.BorderSizePixel=0;srchTB.TextColor3=K.txt;srchTB.Font=Enum.Font.Gotham;srchTB.TextSize=12;srchTB.PlaceholderText=T("search_ph");srchTB.PlaceholderColor3=K.sub;srchTB.ClearTextOnFocus=false;srchTB.Text=""
   Instance.new("UICorner",srchTB).CornerRadius=UDim.new(0,6)
   -- API toggle button
   local apiNames={"ScriptBlox","Rscripts"}
